@@ -11,7 +11,7 @@ Demonstriert:
 - API-Modelle (Create/Read)
 """
 
-from datetime import datetime
+import datetime
 from typing import Optional
 
 from sqlmodel import Field, SQLModel
@@ -61,12 +61,12 @@ class User(UserBase, table=True):
         description="Eindeutige User-ID (auto-increment)"
     )
     
-    created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+    created_at: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.UTC),
         description="Zeitpunkt der Erstellung"
     )
     
-    updated_at: Optional[datetime] = Field(
+    updated_at: Optional[datetime.datetime] = Field(
         default=None,
         description="Zeitpunkt der letzten Änderung"
     )
@@ -90,8 +90,8 @@ class UserRead(UserBase):
     """
     
     id: int
-    created_at: datetime
-    updated_at: Optional[datetime] = None
+    created_at: datetime.datetime
+    updated_at: Optional[datetime.datetime] = None
 
 
 class UserUpdate(SQLModel):
