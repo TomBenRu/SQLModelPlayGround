@@ -9,7 +9,7 @@ Demonstriert:
 - Optional vs. Required Fields
 """
 
-from datetime import datetime
+import datetime
 from typing import Optional
 
 from sqlmodel import Field, SQLModel
@@ -48,8 +48,8 @@ class Post(PostBase, table=True):
         primary_key=True
     )
     
-    created_at: datetime = Field(
-        default_factory=datetime.utcnow
+    created_at: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.UTC)
     )
     
     # Später: Foreign Key zu User
@@ -65,7 +65,7 @@ class PostRead(PostBase):
     """Modell für Post-Rückgabe"""
     
     id: int
-    created_at: datetime
+    created_at: datetime.datetime
 
 
 class PostUpdate(SQLModel):
