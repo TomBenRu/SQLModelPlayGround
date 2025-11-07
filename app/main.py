@@ -6,6 +6,7 @@ Hier wird die FastAPI App initialisiert und gestartet.
 
 from fastapi import FastAPI
 from app.core.config import settings
+from app.api.routes import users
 
 
 # FastAPI App erstellen
@@ -15,6 +16,10 @@ app = FastAPI(
     description="Ein Lernprojekt für SqlModel mit PostgreSQL",
     debug=settings.DEBUG
 )
+
+
+# API Router einbinden
+app.include_router(users.router, prefix="/api/v1")
 
 
 @app.get("/")
