@@ -52,7 +52,7 @@ def create_db_and_tables():
     from app.models import User, Post, Product  # noqa: F401
     
     SQLModel.metadata.create_all(engine)
-    print("✅ Datenbank-Tabellen wurden erstellt!")
+    print("Datenbank-Tabellen wurden erstellt!")
 
 
 def drop_db_and_tables():
@@ -65,4 +65,4 @@ def drop_db_and_tables():
     from app.models import User, Post, Product  # noqa: F401
     
     SQLModel.metadata.drop_all(engine)
-    print("⚠️ Alle Tabellen wurden gelöscht!")
+    print("Alle Tabellen wurden geloescht!")

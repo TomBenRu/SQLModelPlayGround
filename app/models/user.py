@@ -12,9 +12,12 @@ Demonstriert:
 """
 
 import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Relationship, SQLModel
+
+if TYPE_CHECKING:
+    from .post import Post, PostRead
 
 
 class UserBase(SQLModel):
@@ -51,6 +54,8 @@ class User(UserBase, table=True):
     
     Erbt alle Felder von UserBase und fügt DB-spezifische
     Felder hinzu (ID, Timestamps).
+    
+    Relationship: Hat viele Posts (One-to-Many).
     """
     
     __tablename__ = "users"
@@ -70,6 +75,9 @@ class User(UserBase, table=True):
         default=None,
         description="Zeitpunkt der letzten Änderung"
     )
+    
+    # Relationship zu Posts (One-to-Many)
+    posts: list["Post"] = Relationship(back_populates="author")
 
 
 class UserCreate(UserBase):
@@ -115,3 +123,21 @@ class UserUpdate(SQLModel):
     )
     
     is_active: Optional[bool] = None
+
+
+class UserReadWithPosts(UserRead):
+    """
+    Modell für User-Rückgabe MIT allen Posts.
+    
+    Enthält vollständige Liste aller Posts des Users.
+    Ideal für Profil-Ansichten oder User-Details.
+    """
+    
+    posts: list["PostRead"] = []
+
+
+def rebuild_models():
+    from .post import PostRead
+    UserReadWithPosts.model_rebuild()
+
+

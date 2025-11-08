@@ -13,11 +13,14 @@ Demonstriert:
 
 import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
 from app.database import get_session
 from app.models.user import User, UserCreate, UserRead, UserUpdate
+from app.models.post import Post, PostRead
 
 
 # Router erstellen mit Prefix und Tags für Swagger UI
@@ -253,5 +256,47 @@ def delete_user(
     # User löschen (session.delete() funktioniert wie session.add() - Objekt wird getrackt)
     session.delete(db_user)
     session.commit()
+
+
+
+@router.get(
+    "/{user_id}/posts",
+    response_model=list[PostRead],
+    summary="Posts eines Users abrufen",
+    description="Gibt alle Posts eines bestimmten Users zurück."
+)
+def get_user_posts(
+    user_id: int,
+    session: Session = Depends(get_session),
+    skip: int = Query(default=0, ge=0, description="Anzahl zu überspringender Posts"),
+    limit: int = Query(default=20, ge=1, le=100, description="Max. Anzahl zurückzugebender Posts")
+):
+    """
+    Gibt alle Posts eines Users zurück.
+    
+    Parameters:
+        - **user_id**: ID des Users
+        - **skip**: Anzahl zu überspringender Posts (für Pagination)
+        - **limit**: Maximale Anzahl zurückzugebender Posts (1-100)
+    
+    Returns:
+        list[PostRead]: Liste von Posts des Users
+    
+    Raises:
+        404: User mit der angegebenen ID existiert nicht
+    """
+    # Prüfen ob User existiert
+    db_user = session.get(User, user_id)
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with id {user_id} not found"
+        )
+    
+    # Posts des Users abrufen
+    statement = select(Post).where(Post.user_id == user_id).offset(skip).limit(limit)
+    posts = session.exec(statement).all()
+    
+    return posts
     
     # Kein Return bei 204 No Content

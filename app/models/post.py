@@ -10,9 +10,12 @@ Demonstriert:
 """
 
 import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Relationship, SQLModel
+
+if TYPE_CHECKING:
+    from .user import User, UserRead
 
 
 class PostBase(SQLModel):
@@ -38,7 +41,7 @@ class Post(PostBase, table=True):
     """
     Post-Tabelle in der Datenbank.
     
-    Hinweis: In Modul 6 fügen wir eine Beziehung zu User hinzu.
+    Relationship: Gehört zu einem User (author).
     """
     
     __tablename__ = "posts"
@@ -52,20 +55,33 @@ class Post(PostBase, table=True):
         default_factory=lambda: datetime.datetime.now(datetime.UTC)
     )
     
-    # Später: Foreign Key zu User
-    # user_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    # Foreign Key zu User
+    user_id: int = Field(
+        foreign_key="users.id",
+        description="ID des Post-Autors"
+    )
+    
+    # Relationship zum User (bidirektional)
+    author: "User" = Relationship(back_populates="posts")
 
 
 class PostCreate(PostBase):
-    """Modell für Post-Erstellung"""
-    pass
+    """
+    Modell für Post-Erstellung.
+    
+    User-ID muss beim Erstellen angegeben werden.
+    """
+    user_id: int
 
 
 class PostRead(PostBase):
-    """Modell für Post-Rückgabe"""
+    """
+    Modell für Post-Rückgabe (ohne Author-Details).
+    """
     
     id: int
     created_at: datetime.datetime
+    user_id: int
 
 
 class PostUpdate(SQLModel):
@@ -79,3 +95,19 @@ class PostUpdate(SQLModel):
     
     content: Optional[str] = None
     published: Optional[bool] = None
+
+
+class PostReadWithAuthor(PostRead):
+    """
+    Modell für Post-Rückgabe MIT Author-Details.
+    
+    Enthält vollständige User-Daten des Autors.
+    Ideal für Detail-Ansichten eines Posts.
+    """
+    
+    author: "UserRead"
+
+
+def rebuild_models():
+    from .user import UserRead
+    PostReadWithAuthor.model_rebuild()

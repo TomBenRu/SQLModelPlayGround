@@ -6,7 +6,7 @@ Hier wird die FastAPI App initialisiert und gestartet.
 
 from fastapi import FastAPI
 from app.core.config import settings
-from app.api.routes import users
+from app.api.routes import users, posts
 
 
 # FastAPI App erstellen
@@ -20,6 +20,7 @@ app = FastAPI(
 
 # API Router einbinden
 app.include_router(users.router, prefix="/api/v1")
+app.include_router(posts.router, prefix="/api/v1/posts", tags=["posts"])
 
 
 @app.get("/")
