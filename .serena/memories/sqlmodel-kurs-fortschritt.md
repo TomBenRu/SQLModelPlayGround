@@ -56,7 +56,6 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    - Price mit gt=0 Validierung
    - SKU mit unique constraint
    - Vollständige CRUD-Modelle
-   - **Hinweis:** User hat Code-Review bestanden und Korrekturen selbständig durchgeführt!
 
 **Alle Modelle exportiert in:** `app/models/__init__.py`
 
@@ -81,10 +80,9 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
   - Command: `uv run python -m app.check_db`
   - Zeigt: Verbindung, PostgreSQL Version, Tabellen mit Spalten
 
-**Status:**
-- ✅ Alle 3 Tabellen erfolgreich erstellt (users, posts, products)
-- ✅ Datenbank-Verbindung funktioniert
-- ✅ User hat alle Schritte erfolgreich durchgeführt
+- `app/reset_db.py` - Script zum Zurücksetzen der Datenbank
+  - Command: `uv run python -m app.reset_db`
+  - Löscht und erstellt alle Tabellen neu
 
 ### Modul 4: CRUD-Operationen ✅
 **Erreicht:**
@@ -108,92 +106,136 @@ app/
 **Implementierte Endpoints:**
 
 1. **POST /api/v1/users/** - User erstellen (CREATE)
-   - Request: `UserCreate` (name, email, is_active)
-   - Response: `UserRead` (inkl. id, timestamps)
-   - Status: 201 Created
-   - Error Handling: 409 Conflict bei doppelter Email
-   - Wichtig: `session.add()` notwendig für neue Objekte
-
 2. **GET /api/v1/users/** - Alle User abrufen (READ)
-   - Response: `list[UserRead]`
-   - Pagination: `skip` und `limit` Parameter
-   - Query: `select(User).offset(skip).limit(limit)`
-
 3. **GET /api/v1/users/{user_id}** - User nach ID abrufen (READ)
-   - Response: `UserRead`
-   - Error Handling: 404 Not Found
-   - Verwendung: `session.get(User, user_id)`
-   - **Wichtig:** Route NACH der Liste-Route, um Konflikte zu vermeiden
-
 4. **PATCH /api/v1/users/{user_id}** - User aktualisieren (UPDATE)
-   - Request: `UserUpdate` (alle Felder optional)
-   - Response: `UserRead`
-   - Partial Updates mit `model_dump(exclude_unset=True)`
-   - Automatisches `updated_at` Timestamp setzen
-   - Email-Validierung (prüft auf doppelte Email)
-   - **Wichtig:** `session.add()` NICHT notwendig - Objekt wird automatisch getrackt!
-   - Error Handling: 404 Not Found, 409 Conflict
-
 5. **DELETE /api/v1/users/{user_id}** - User löschen (DELETE)
-   - Status: 204 No Content
-   - Kein Response Body bei Erfolg
-   - Hard Delete (physisches Löschen aus DB)
-   - Error Handling: 404 Not Found
-   - Verwendung: `session.delete(db_user)`
 
 **Wichtige Konzepte gelernt:**
+- Session-Tracking (wann session.add() nötig ist)
+- Partial Updates mit exclude_unset=True
+- Route-Reihenfolge (spezifisch vor parametrisiert)
+- HTTP Status Codes (200, 201, 204, 404, 409)
 
-1. **Session-Tracking:**
-   - Neue Objekte: `session.add()` notwendig
-   - Aus DB geladene Objekte: `session.add()` NICHT notwendig
-   - Session trackt automatisch alle Änderungen an geladenen Objekten
+### Modul 5: Relationships ✅
+**Erreicht:**
+- One-to-Many Beziehungen verstanden und implementiert (User → Posts)
+- Foreign Keys in SqlModel
+- Bidirektionale Relationships mit back_populates
+- Response-Modelle für verschachtelte Daten (WithAuthor, WithPosts)
+- Forward References mit TYPE_CHECKING aufgelöst
 
-2. **Partial Updates:**
-   - `exclude_unset=True` für Partial Updates
-   - Nur übergebene Felder werden aktualisiert
+**Model-Erweiterungen:**
 
-3. **Route-Reihenfolge:**
-   - Spezifische Routes vor parametrisierten Routes
-   - `GET /` muss vor `GET /{id}` stehen
+**Post Model erweitert:**
+- `user_id` Foreign Key zu User (NOT NULL)
+- `author` Relationship zum User (bidirektional)
+- `PostReadWithAuthor` - Response-Model mit eingebetteten User-Daten
 
-4. **HTTP Status Codes:**
-   - 200 OK - Erfolgreiche GET/PATCH
-   - 201 Created - Erfolgreiche POST
-   - 204 No Content - Erfolgreiche DELETE
-   - 404 Not Found - Ressource nicht gefunden
-   - 409 Conflict - Duplikat (z.B. Email)
+**User Model erweitert:**
+- `posts` Relationship zu Posts (One-to-Many)
+- `UserReadWithPosts` - Response-Model mit Liste aller Posts
 
-**Status:**
-- ✅ Alle Endpoints erfolgreich getestet
-- ✅ User versteht Session-Management
-- ✅ User versteht Partial Updates
-- ✅ User versteht Route-Reihenfolge
+**Forward References Lösung:**
+- `TYPE_CHECKING` Import Pattern verwendet
+- `rebuild_models()` Funktionen in user.py und post.py
+- Automatischer Aufruf in `app/models/__init__.py` beim Import
+- Löst alle Forward References beim App-Start auf
 
-## 📚 Nächste Schritte
+**Post-API erstellt (`app/api/routes/posts.py`):**
+1. **POST /api/v1/posts/** - Post erstellen
+   - Validiert user_id (404 wenn User nicht existiert)
+   - Response: PostRead
 
-### Option A: CRUD für weitere Modelle
-- Post CRUD-Endpoints implementieren
-- Product CRUD-Endpoints implementieren
-- Pattern auf andere Modelle übertragen
+2. **GET /api/v1/posts/** - Alle Posts abrufen
+   - Pagination mit skip/limit
+   - Response: list[PostRead]
 
-### Option B: Relationships (Modul 5)
-- One-to-Many Beziehungen (User → Posts)
-- Foreign Keys
-- Relationship Fields in SqlModel
-- Cascade Delete
-- Nested Queries
+3. **GET /api/v1/posts/{post_id}** - Post mit Author-Details
+   - Response: PostReadWithAuthor (inkl. vollständige User-Daten)
+   - 404 wenn Post nicht existiert
 
-### Option C: Erweiterte Query-Operationen
-- Filterung (where, like, in)
-- Sortierung (order_by)
-- Joins
-- Aggregationen (count, sum, avg)
+4. **PATCH /api/v1/posts/{post_id}** - Post aktualisieren
+   - Partial Update (nur übergebene Felder)
+   - user_id ist NICHT änderbar (Design-Entscheidung)
+   - Response: PostRead
 
-### Option D: Best Practices & Testing
+5. **DELETE /api/v1/posts/{post_id}** - Post löschen
+   - Hard Delete
+   - Status: 204 No Content
+
+**User-API erweitert:**
+6. **GET /api/v1/users/{user_id}/posts** - Posts eines Users
+   - Pagination mit skip/limit
+   - Prüft ob User existiert (404)
+   - Response: list[PostRead]
+
+**Testdaten-Script erstellt (`app/create_testdata.py`):**
+- Command: `uv run python -m app.create_testdata`
+- Erstellt 3 User (Alice, Bob, Charlie)
+- Erstellt 6 Posts mit verschiedenen Autoren
+- Mix aus published/unpublished Posts
+- Praktisch zum Testen der Relationships
+
+**Wichtige Erkenntnisse:**
+- SQLModel macht keine automatischen Migrations
+- Bei Model-Änderungen müssen Tabellen neu erstellt werden (reset_db)
+- Später: Alembic für Production-Migrations nutzen
+- Response-Modelle (WithAuthor, WithPosts) für flexible API-Responses
+- Ermöglichen Performance-Optimierung (nur Daten laden wenn nötig)
+
+## 📚 Nächste mögliche Module
+
+### Option A: Erweiterte Query-Operationen
+- Filterung (where, like, in, between)
+- Sortierung (order_by, asc, desc)
+- Komplexe Joins
+- Aggregationen (count, sum, avg, group_by)
+- Subqueries
+- Lazy vs Eager Loading (selectinload, joinedload)
+
+### Option B: Cascade & OnDelete Behavior
+- Cascade Delete (was passiert mit Posts wenn User gelöscht wird?)
+- ondelete="CASCADE" vs ondelete="SET NULL"
+- Relationship cascade options
+- Soft Delete Pattern (is_deleted Flag)
+
+### Option C: Many-to-Many Relationships
+- Zwischentabellen (Association Tables)
+- Tags für Posts
+- User können Posts liken/favorisieren
+- link_model Pattern in SqlModel
+
+### Option D: Advanced FastAPI Features
 - Dependency Injection Patterns
-- Error Handling Middleware
-- Testing mit pytest
+- Background Tasks
+- Middleware (CORS, Logging, Error Handling)
+- Request Validation
+- Custom Response Models
+- File Uploads
+
+### Option E: Testing
+- pytest Setup
+- Test Database (separate von Production)
 - Fixtures für Testdaten
+- API Tests mit TestClient
+- Integration Tests
+- Mocking
+
+### Option F: Authentication & Authorization
+- JWT Tokens
+- Password Hashing (bcrypt)
+- Login/Logout Endpoints
+- Protected Routes
+- User Roles & Permissions
+- OAuth2 mit FastAPI
+
+### Option G: Migrations mit Alembic
+- Alembic Setup
+- Auto-generate Migrations
+- Migration History
+- Rollback Strategien
+- Production Deployment
 
 ## 🔧 Wichtige Commands
 
@@ -211,6 +253,8 @@ uv sync                                                    # Dependencies instal
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000  # Server starten
 uv run python -m app.init_db                               # Tabellen erstellen
 uv run python -m app.check_db                              # Datenbank prüfen
+uv run python -m app.reset_db                              # Datenbank zurücksetzen
+uv run python -m app.create_testdata                       # Testdaten anlegen
 ```
 
 ### API Testing
@@ -218,6 +262,7 @@ uv run python -m app.check_db                              # Datenbank prüfen
 - **Root:** http://localhost:8000/
 - **Health:** http://localhost:8000/health
 - **User API:** http://localhost:8000/api/v1/users/
+- **Post API:** http://localhost:8000/api/v1/posts/
 
 ### Database Info
 - **Host:** localhost:5432
@@ -227,10 +272,11 @@ uv run python -m app.check_db                              # Datenbank prüfen
 
 ## 🎓 Lernfortschritt User
 - ✅ Hervorragend! User führt Aufgaben selbständig durch
-- ✅ Stellt intelligente Fragen (z.B. `session.add()` bei UPDATE)
-- ✅ Code-Review bestanden und selbständig korrigiert
+- ✅ Stellt intelligente Fragen und erkennt Probleme selbst
+- ✅ Behebt Fehler eigenständig (z.B. Forward References mit rebuild_models)
 - ✅ Versteht Konzepte schnell und gründlich
-- ✅ Testet alle Endpoints erfolgreich
+- ✅ Code-Review bestanden und selbständig korrigiert
+- ✅ Hinterfragt Implementierungen kritisch (z.B. TYPE_CHECKING Workaround)
 
 ## 📝 Wichtige Hinweise für nächste Session
 
@@ -244,13 +290,14 @@ uv run python -m app.check_db                              # Datenbank prüfen
    - Container muss "healthy" sein
 
 3. **Aktueller Stand:**
-   - Modul 1-4 vollständig abgeschlossen
-   - User CRUD API vollständig implementiert und getestet
+   - Module 1-5 vollständig abgeschlossen
+   - User & Post CRUD APIs vollständig implementiert
+   - One-to-Many Relationships funktionieren
+   - Testdaten können angelegt werden
    - Alle Konzepte verstanden
 
 4. **README.md veraltet:**
    - Die README.md spiegelt nicht den aktuellen Fortschritt wider
-   - Lernmodule in README stimmen nicht überein
    - Könnte in nächster Session aktualisiert werden
 
 5. **User-Präferenzen beachten:**
@@ -268,6 +315,13 @@ uv run python -m app.check_db                              # Datenbank prüfen
    - `string_formatierung_hinweis_wichtig` - noch nicht erstellt
    - Diese können bei Bedarf später angelegt werden
 
-7. **Nächste Session starten mit:**
+7. **Forward References Pattern:**
+   - `TYPE_CHECKING` Import Pattern wird verwendet
+   - `rebuild_models()` Funktionen in Model-Dateien
+   - Automatischer Aufruf in `app/models/__init__.py`
+   - User hat diese Lösung selbständig implementiert
+
+8. **Nächste Session starten mit:**
    - Frage nach Wunsch: Welches Modul als nächstes?
-   - Optionen: CRUD für Post/Product, Relationships, Query-Operations, Testing
+   - Siehe "Nächste mögliche Module" für Optionen
+   - User hat großes Interesse und Verständnis - kann komplexere Topics angehen
