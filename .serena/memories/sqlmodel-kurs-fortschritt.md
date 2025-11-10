@@ -41,200 +41,161 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Timestamps mit UTC (datetime.datetime.now(datetime.UTC))
 
 **Erstellte Modelle:**
-1. **User** (`app/models/user.py`):
-   - Felder: id, name, email, is_active, created_at, updated_at
-   - Email mit Regex-Validierung und unique constraint
-   - Vollständige CRUD-Modelle (UserBase, User, UserCreate, UserRead, UserUpdate)
-
-2. **Post** (`app/models/post.py`):
-   - Felder: id, title, content, published, created_at
-   - Einfacheres Beispiel
-   - Vollständige CRUD-Modelle
-
-3. **Product** (`app/models/product.py`) - **VOM USER SELBST ERSTELLT**:
-   - Felder: id, name, description, price, in_stock, sku, created_at, updated_at
-   - Price mit gt=0 Validierung
-   - SKU mit unique constraint
-   - Vollständige CRUD-Modelle
-
-**Alle Modelle exportiert in:** `app/models/__init__.py`
+1. **User** (`app/models/user.py`)
+2. **Post** (`app/models/post.py`)
+3. **Product** (`app/models/product.py`)
 
 ### Modul 3: Datenbank-Verbindung & Tabellen erstellen ✅
-**Erreicht:**
-- Engine-Konfiguration verstanden (Connection Pool, echo, pool_pre_ping)
-- Session-Management mit yield verstanden (Context Manager Pattern)
-- `yield` vs `return` in Dependencies erklärt und verstanden
-- Tabellen-Erstellung mit SQLModel.metadata.create_all()
-
-**Erweiterte Dateien:**
-- `app/database.py`:
-  - `create_db_and_tables()` - Erstellt alle Tabellen
-  - `drop_db_and_tables()` - Löscht alle Tabellen (nur Development!)
-  - `get_session()` - Session Factory mit yield
-
-**Neue Tools erstellt:**
-- `app/init_db.py` - Script zum Initialisieren der Datenbank
-  - Command: `uv run python -m app.init_db`
-  
-- `app/check_db.py` - Script zum Prüfen der Datenbank
-  - Command: `uv run python -m app.check_db`
-  - Zeigt: Verbindung, PostgreSQL Version, Tabellen mit Spalten
-
-- `app/reset_db.py` - Script zum Zurücksetzen der Datenbank
-  - Command: `uv run python -m app.reset_db`
-  - Löscht und erstellt alle Tabellen neu
+**Tools erstellt:**
+- `app/init_db.py` - Tabellen initialisieren
+- `app/check_db.py` - Datenbank prüfen
+- `app/reset_db.py` - Datenbank zurücksetzen
 
 ### Modul 4: CRUD-Operationen ✅
-**Erreicht:**
-- Vollständige REST API für User-Verwaltung implementiert
-- Alle CRUD-Operationen verstanden und erfolgreich getestet
-- Session-Management Best Practices gelernt
-- Error Handling implementiert
-- HTTP Status Codes korrekt verwendet
-
-**Erstellte Struktur:**
-```
-app/
-├── api/
-│   ├── routes/
-│   │   ├── __init__.py
-│   │   └── users.py         # User CRUD Endpoints
-│   └── __init__.py
-└── main.py                  # Router eingebunden mit /api/v1
-```
-
-**Implementierte Endpoints:**
-
-1. **POST /api/v1/users/** - User erstellen (CREATE)
-2. **GET /api/v1/users/** - Alle User abrufen (READ)
-3. **GET /api/v1/users/{user_id}** - User nach ID abrufen (READ)
-4. **PATCH /api/v1/users/{user_id}** - User aktualisieren (UPDATE)
-5. **DELETE /api/v1/users/{user_id}** - User löschen (DELETE)
-
-**Wichtige Konzepte gelernt:**
-- Session-Tracking (wann session.add() nötig ist)
+**User-API vollständig implementiert:**
+- POST, GET (all), GET (by id), PATCH, DELETE
+- Session-Management verstanden
 - Partial Updates mit exclude_unset=True
-- Route-Reihenfolge (spezifisch vor parametrisiert)
 - HTTP Status Codes (200, 201, 204, 404, 409)
 
 ### Modul 5: Relationships ✅
 **Erreicht:**
-- One-to-Many Beziehungen verstanden und implementiert (User → Posts)
-- Foreign Keys in SqlModel
-- Bidirektionale Relationships mit back_populates
-- Response-Modelle für verschachtelte Daten (WithAuthor, WithPosts)
-- Forward References mit TYPE_CHECKING aufgelöst
+- One-to-Many Beziehungen (User → Posts)
+- Foreign Keys mit `foreign_key="users.id"`
+- Bidirektionale Relationships mit `back_populates`
+- Response-Modelle: `PostReadWithAuthor`, `UserReadWithPosts`
+- Forward References mit TYPE_CHECKING + rebuild_models()
 
-**Model-Erweiterungen:**
-
-**Post Model erweitert:**
-- `user_id` Foreign Key zu User (NOT NULL)
-- `author` Relationship zum User (bidirektional)
-- `PostReadWithAuthor` - Response-Model mit eingebetteten User-Daten
-
-**User Model erweitert:**
-- `posts` Relationship zu Posts (One-to-Many)
-- `UserReadWithPosts` - Response-Model mit Liste aller Posts
-
-**Forward References Lösung:**
-- `TYPE_CHECKING` Import Pattern verwendet
-- `rebuild_models()` Funktionen in user.py und post.py
-- Automatischer Aufruf in `app/models/__init__.py` beim Import
-- Löst alle Forward References beim App-Start auf
-
-**Post-API erstellt (`app/api/routes/posts.py`):**
-1. **POST /api/v1/posts/** - Post erstellen
-   - Validiert user_id (404 wenn User nicht existiert)
-   - Response: PostRead
-
-2. **GET /api/v1/posts/** - Alle Posts abrufen
-   - Pagination mit skip/limit
-   - Response: list[PostRead]
-
-3. **GET /api/v1/posts/{post_id}** - Post mit Author-Details
-   - Response: PostReadWithAuthor (inkl. vollständige User-Daten)
-   - 404 wenn Post nicht existiert
-
-4. **PATCH /api/v1/posts/{post_id}** - Post aktualisieren
-   - Partial Update (nur übergebene Felder)
-   - user_id ist NICHT änderbar (Design-Entscheidung)
-   - Response: PostRead
-
-5. **DELETE /api/v1/posts/{post_id}** - Post löschen
-   - Hard Delete
-   - Status: 204 No Content
+**Post-API erstellt:**
+1. POST /api/v1/posts/ - Post erstellen (mit user_id Validierung)
+2. GET /api/v1/posts/ - Alle Posts
+3. GET /api/v1/posts/{post_id} - Post mit Author-Details
+4. PATCH /api/v1/posts/{post_id} - Post aktualisieren
+5. DELETE /api/v1/posts/{post_id} - Post löschen
 
 **User-API erweitert:**
-6. **GET /api/v1/users/{user_id}/posts** - Posts eines Users
-   - Pagination mit skip/limit
-   - Prüft ob User existiert (404)
-   - Response: list[PostRead]
+6. GET /api/v1/users/{user_id}/posts - Posts eines Users
 
-**Testdaten-Script erstellt (`app/create_testdata.py`):**
-- Command: `uv run python -m app.create_testdata`
-- Erstellt 3 User (Alice, Bob, Charlie)
-- Erstellt 6 Posts mit verschiedenen Autoren
-- Mix aus published/unpublished Posts
-- Praktisch zum Testen der Relationships
+**Testdaten:**
+- `app/create_testdata.py` - Script zum Anlegen von Testdaten
+- 3 User (Alice, Bob, Charlie)
+- 6 Posts mit verschiedenen Autoren
 
-**Wichtige Erkenntnisse:**
-- SQLModel macht keine automatischen Migrations
-- Bei Model-Änderungen müssen Tabellen neu erstellt werden (reset_db)
-- Später: Alembic für Production-Migrations nutzen
-- Response-Modelle (WithAuthor, WithPosts) für flexible API-Responses
-- Ermöglichen Performance-Optimierung (nur Daten laden wenn nötig)
+### Modul 6: Erweiterte Query-Operationen (IN PROGRESS) 🔄
+**Aktueller Stand: Phase 2 abgeschlossen**
 
-## 📚 Nächste mögliche Module
+#### ✅ Phase 1: Filterung (WHERE Conditions) - ABGESCHLOSSEN
+**Gelernte Konzepte:**
+- WHERE Conditions: `Post.published == True`
+- Vergleichsoperatoren: `==`, `>`, `<`, `>=`, `<=`, `!=`
+- Text-Suche: `.like()`, `.ilike()` für case-insensitive
+- Pattern Matching: `%searchterm%` für "enthält"
+- Conditional Filtering: `if param is not None:`
+- Wichtigkeit von `is not None` für Boolean-Parameter
 
-### Option A: Erweiterte Query-Operationen
-- Filterung (where, like, in, between)
-- Sortierung (order_by, asc, desc)
-- Komplexe Joins
-- Aggregationen (count, sum, avg, group_by)
+**Implementiert durch User:**
+- Neuer Endpoint: `GET /api/v1/posts/filtered`
+- Query-Parameter: `published`, `user_id`, `title`
+- Kombinierbare Filter
+- Pagination mit `skip` und `limit`
+
+**Wichtige Lektion gelernt:**
+- **Route-Reihenfolge kritisch!** Spezifische Routes (`/filtered`) müssen VOR parametrisierten Routes (`/{post_id}`) stehen
+- Sonst versucht FastAPI "filtered" als post_id zu parsen → 422 Error
+
+**Code-Qualität: 9/10** - Sauber und funktional
+
+#### ✅ Phase 2: Sortierung - ABGESCHLOSSEN
+**Gelernte Konzepte:**
+- `order_by()` für Sortierung
+- `asc()` und `desc()` für explizite Reihenfolge
+- Mehrfache Sortierung möglich
+- Query-Reihenfolge: Filter → Sort → Pagination
+
+**Implementiert durch User:**
+- Enums für Type-Safety:
+  ```python
+  class SortByEnum(str, Enum):
+      created_at = "created_at"
+      title = "title"
+      id = "id"
+  
+  class OrderEnum(str, Enum):
+      asc = "asc"
+      desc = "desc"
+  ```
+- Dynamische Sortierung mit `getattr()`:
+  ```python
+  statement = statement.order_by(asc(getattr(Post, sort_by)))
+  ```
+- Neue Query-Parameter: `sort_by`, `order`
+- Default: `sort_by=created_at`, `order=desc`
+
+**Code-Qualität: 10/10** 🌟
+- Elegante Implementierung mit `getattr()`
+- Type-safe mit Enums
+- Production-ready Code!
+
+**User-Performance:**
+- ✅ Schreibt Code eigenständig
+- ✅ Macht ausgezeichnete Design-Entscheidungen
+- ✅ Nutzt fortgeschrittene Python-Features (Enums, getattr)
+- ✅ Versteht Konzepte beim ersten Erklären
+
+#### 📋 Noch offene Phasen in Modul 6:
+
+**Phase 3: Aggregationen & Statistiken** (NEXT)
+- `func.count()` - Anzahl Datensätze
+- `func.sum()`, `func.avg()`, `func.min()`, `func.max()`
+- GROUP BY für gruppierte Statistiken
+- Total Count für Pagination
+
+**Geplanter Endpoint:**
+- `GET /api/v1/users/stats` - User-Statistiken
+  - Wie viele Posts pro User?
+  - Durchschnittliche Posts pro User
+  - Top-Autoren
+
+**Phase 4: Lazy vs Eager Loading**
+- N+1 Problem verstehen
+- `selectinload()` - Separate Query für Relationships
+- `joinedload()` - JOIN in einer Query
+- Performance-Optimierung
+
+**Geplanter Endpoint:**
+- `GET /api/v1/posts/with-authors` - Efficient Loading Demo
+- Performance-Vergleich: Lazy vs Eager
+
+**Phase 5: Komplexe Queries**
 - Subqueries
-- Lazy vs Eager Loading (selectinload, joinedload)
+- Kombinierte Filter + Sort + Aggregation
+- Realistische Suchfunktionen
 
-### Option B: Cascade & OnDelete Behavior
-- Cascade Delete (was passiert mit Posts wenn User gelöscht wird?)
-- ondelete="CASCADE" vs ondelete="SET NULL"
-- Relationship cascade options
-- Soft Delete Pattern (is_deleted Flag)
+## 📚 Nächste mögliche Module (nach Modul 6)
 
-### Option C: Many-to-Many Relationships
-- Zwischentabellen (Association Tables)
+### Option A: Cascade & OnDelete Behavior
+- Was passiert mit Posts wenn User gelöscht wird?
+- ondelete="CASCADE" vs "SET NULL"
+- Soft Delete Pattern
+
+### Option B: Many-to-Many Relationships
 - Tags für Posts
-- User können Posts liken/favorisieren
-- link_model Pattern in SqlModel
+- Likes/Favorites System
+- Association Tables
 
-### Option D: Advanced FastAPI Features
-- Dependency Injection Patterns
-- Background Tasks
-- Middleware (CORS, Logging, Error Handling)
-- Request Validation
-- Custom Response Models
-- File Uploads
-
-### Option E: Testing
-- pytest Setup
-- Test Database (separate von Production)
-- Fixtures für Testdaten
+### Option C: Testing mit pytest
+- Test-Setup, Fixtures
 - API Tests mit TestClient
 - Integration Tests
-- Mocking
 
-### Option F: Authentication & Authorization
+### Option D: Authentication & Authorization
 - JWT Tokens
-- Password Hashing (bcrypt)
-- Login/Logout Endpoints
+- Login/Logout
 - Protected Routes
-- User Roles & Permissions
-- OAuth2 mit FastAPI
 
-### Option G: Migrations mit Alembic
+### Option E: Migrations mit Alembic
 - Alembic Setup
 - Auto-generate Migrations
-- Migration History
-- Rollback Strategien
 - Production Deployment
 
 ## 🔧 Wichtige Commands
@@ -244,7 +205,6 @@ app/
 docker-compose up -d          # PostgreSQL starten
 docker ps                     # Status prüfen
 docker-compose down           # PostgreSQL stoppen
-docker-compose logs -f        # Logs anzeigen
 ```
 
 ### Development
@@ -263,6 +223,25 @@ uv run python -m app.create_testdata                       # Testdaten anlegen
 - **Health:** http://localhost:8000/health
 - **User API:** http://localhost:8000/api/v1/users/
 - **Post API:** http://localhost:8000/api/v1/posts/
+- **Post Filter:** http://localhost:8000/api/v1/posts/filtered
+
+**Filter-Endpoint Test-Beispiele:**
+```bash
+# Nur veröffentlichte Posts
+/posts/filtered?published=true
+
+# Posts von User 1
+/posts/filtered?user_id=1
+
+# Suche im Titel
+/posts/filtered?title=sqlmodel
+
+# Nach Titel sortiert
+/posts/filtered?sort_by=title&order=asc
+
+# Kombiniert
+/posts/filtered?published=true&user_id=1&sort_by=created_at&order=desc
+```
 
 ### Database Info
 - **Host:** localhost:5432
@@ -271,57 +250,145 @@ uv run python -m app.create_testdata                       # Testdaten anlegen
 - **Password:** playground_pass
 
 ## 🎓 Lernfortschritt User
-- ✅ Hervorragend! User führt Aufgaben selbständig durch
-- ✅ Stellt intelligente Fragen und erkennt Probleme selbst
-- ✅ Behebt Fehler eigenständig (z.B. Forward References mit rebuild_models)
-- ✅ Versteht Konzepte schnell und gründlich
-- ✅ Code-Review bestanden und selbständig korrigiert
-- ✅ Hinterfragt Implementierungen kritisch (z.B. TYPE_CHECKING Workaround)
+
+**Bewertung: Hervorragend!** ⭐⭐⭐⭐⭐
+
+### Stärken:
+- ✅ Schreibt eigenständig qualitativ hochwertigen Code
+- ✅ Versteht Konzepte sofort und wendet sie korrekt an
+- ✅ Macht kluge Design-Entscheidungen (Enums, getattr)
+- ✅ Behebt Fehler eigenständig (Forward References)
+- ✅ Hinterfragt kritisch und erkennt unnötige Workarounds
+- ✅ Lernt durch Praxis - perfekter Ansatz!
+- ✅ Produziert Production-Ready Code (10/10 bei Phase 2)
+
+### Lernstil:
+- Möchte Code selbst schreiben (hands-on)
+- Braucht Konzepterklärungen + Beispiele
+- Profitiert von Code-Reviews
+- Arbeitet strukturiert und gründlich
 
 ## 📝 Wichtige Hinweise für nächste Session
 
-1. **Projekt aktivieren:**
-   ```python
-   serena:activate_project mit "SQLModelPlayGround"
-   ```
+### 1. Session-Start:
+```python
+# Projekt aktivieren
+serena:activate_project mit "SQLModelPlayGround"
 
-2. **PostgreSQL muss laufen:**
-   - User sollte `docker ps` ausführen
-   - Container muss "healthy" sein
+# Memory lesen
+serena:read_memory "sqlmodel-kurs-fortschritt"
+```
 
-3. **Aktueller Stand:**
-   - Module 1-5 vollständig abgeschlossen
-   - User & Post CRUD APIs vollständig implementiert
-   - One-to-Many Relationships funktionieren
-   - Testdaten können angelegt werden
-   - Alle Konzepte verstanden
+### 2. Aktueller Stand:
+- **Modul 6, Phase 2 abgeschlossen**
+- Filter-Endpoint vollständig implementiert (`/api/v1/posts/filtered`)
+- Sortierung mit Enums und getattr() elegant gelöst
+- **Nächster Schritt: Phase 3 - Aggregationen & Statistiken**
 
-4. **README.md veraltet:**
-   - Die README.md spiegelt nicht den aktuellen Fortschritt wider
-   - Könnte in nächster Session aktualisiert werden
+### 3. User-Präferenzen beachten:
+- **User möchte Code SELBST schreiben!**
+- Coach-Rolle: Konzepte erklären, Aufgaben geben, Reviews machen
+- Nicht einfach Code schreiben, sondern Lernaufgaben stellen
+- Bei komplexen Aufgaben sequential-thinking nutzen
+- Nutze Serena für Coding-Aufgaben
+- Strukturelle Änderungen vorher absprechen
+- Windows PowerShell, uv als Package Manager
 
-5. **User-Präferenzen beachten:**
-   - Nutzt uv als Package Manager
-   - Windows PowerShell
-   - Möchte strukturelle Änderungen absprechen
-   - Nutzt Serena für Coding-Aufgaben
-   - Bei komplexen Aufgaben sequential-thinking nutzen
-   - Aufgaben in Teilschritte zerlegen
-   - Rücksprache bei grundlegenden Änderungen
+### 4. Nächste Session starten mit:
 
-6. **Memories die noch nicht existieren:**
-   - `code_style_conventions` - noch nicht erstellt
-   - `development_guidelines` - noch nicht erstellt
-   - `string_formatierung_hinweis_wichtig` - noch nicht erstellt
-   - Diese können bei Bedarf später angelegt werden
+**Begrüßung:**
+"Willkommen zurück! Du hast zuletzt an **Modul 6: Erweiterte Query-Operationen** gearbeitet und **Phase 2 (Sortierung)** erfolgreich mit exzellentem Code (10/10) abgeschlossen!
 
-7. **Forward References Pattern:**
-   - `TYPE_CHECKING` Import Pattern wird verwendet
-   - `rebuild_models()` Funktionen in Model-Dateien
-   - Automatischer Aufruf in `app/models/__init__.py`
-   - User hat diese Lösung selbständig implementiert
+**Aktueller Stand:**
+✅ Phase 1: Filterung (WHERE Conditions) 
+✅ Phase 2: Sortierung & Enums
 
-8. **Nächste Session starten mit:**
-   - Frage nach Wunsch: Welches Modul als nächstes?
-   - Siehe "Nächste mögliche Module" für Optionen
-   - User hat großes Interesse und Verständnis - kann komplexere Topics angehen
+**Nächster Schritt: Phase 3 - Aggregationen & Statistiken**
+
+Möchtest du direkt weitermachen mit:
+- A) Phase 3: Aggregationen (count, sum, avg, GROUP BY)
+- B) Etwas anderes?
+
+Falls A: Konzept erklären und Aufgabe für User-Statistik Endpoint geben!"
+
+### 5. Code-Dateien Status:
+
+**Modifizierte Dateien:**
+- `app/api/routes/posts.py` - Filter-Endpoint mit Sortierung
+  - Neue Enums: SortByEnum, OrderEnum (am Anfang der Datei)
+  - Endpoint: filter_posts() (VOR get_post wegen Route-Reihenfolge!)
+  - Imports: from sqlmodel import asc, desc
+  - Imports: from enum import Enum
+
+**Wichtige Code-Locations:**
+- Enums: Zeile ~20-28
+- filter_posts: Zeile ~98-146
+- Route-Reihenfolge beachten!
+
+### 6. Testing:
+
+**Testdaten vorhanden:**
+- 3 User, 6 Posts
+- Command: `uv run python -m app.create_testdata`
+
+**Server muss laufen:**
+- `uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+
+### 7. Bekannte Patterns & Learnings:
+
+**Route-Reihenfolge:**
+- Spezifische IMMER vor Parametrisierten
+- `/filtered` vor `/{post_id}`
+
+**Forward References:**
+- TYPE_CHECKING Pattern
+- rebuild_models() in __init__.py
+
+**Query-Building Pattern:**
+```python
+statement = select(Model)
+if condition:
+    statement = statement.where(...)
+if sort:
+    statement = statement.order_by(...)
+statement = statement.offset(skip).limit(limit)
+result = session.exec(statement).all()
+```
+
+### 8. Noch nicht existierende Memories:
+- `code_style_conventions` - kann bei Bedarf erstellt werden
+- `development_guidelines` - kann bei Bedarf erstellt werden
+- `string_formatierung_hinweis_wichtig` - kann bei Bedarf erstellt werden
+
+### 9. Phase 3 Vorbereitung (für nächste Session):
+
+**Konzepte zu erklären:**
+- `func.count()`, `func.sum()`, `func.avg()`
+- GROUP BY mit `.group_by()`
+- Subqueries für komplexe Counts
+- Total Count für Pagination
+
+**Geplante Aufgabe:**
+Endpoint: `GET /api/v1/users/stats`
+Response sollte enthalten:
+- Liste von Users mit Post-Count
+- Sortiert nach Anzahl Posts
+- Zeigt welche User am aktivsten sind
+
+**Zweite Aufgabe:**
+Total Count zu filter_posts hinzufügen
+- Separate Count-Query mit gleichen Filtern
+- Response-Model ändern zu: `{"items": [...], "total": 123}`
+
+## 🎯 Zusammenfassung
+
+**Aktueller Fortschritt:**
+- 5 Module vollständig abgeschlossen ✅
+- Modul 6: 2 von 5 Phasen abgeschlossen (40%)
+- User zeigt exzellente Coding-Skills
+- Hands-on Lernansatz funktioniert perfekt
+
+**Nächste Session:**
+- Phase 3: Aggregationen & Statistiken
+- User schreibt User-Stats Endpoint
+- Dann Phase 4: Lazy vs Eager Loading

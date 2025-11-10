@@ -3,11 +3,19 @@ FastAPI Application Entry Point
 ================================
 Hier wird die FastAPI App initialisiert und gestartet.
 """
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from app.core.config import settings
 from app.api.routes import users, posts
+from app.database import create_db_and_tables
 
+
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     # Startup
+#     create_db_and_tables()
+#     yield
 
 # FastAPI App erstellen
 app = FastAPI(

@@ -5,15 +5,27 @@ CRUD Endpoints für Posts mit Relationships zu Users.
 """
 
 import datetime
+from enum import StrEnum
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlmodel import Session, select
+from sqlmodel import Session, select, asc, desc
 
 from app.database import get_session
 from app.models import Post, PostCreate, PostRead, PostReadWithAuthor, PostUpdate, User
 
 router = APIRouter()
+
+
+class SortByEnum(StrEnum):
+    created_at = "created_at"
+    title = "title"
+    id = "id"
+
+
+class OrderEnum(StrEnum):
+    asc = "asc"
+    desc = "desc"
 
 
 @router.post(
@@ -85,6 +97,57 @@ def get_posts(
 
 
 @router.get(
+    "/filtered",
+    response_model=list[PostRead],
+    summary="Posts filtern",
+    description="Gibt eine Liste von Posts zurück, die mehreren Filtern entsprechen."
+)
+def filter_posts(
+        session: Session = Depends(get_session),
+        published: bool | None = Query(default=None, description="Ist veröffentlicht?"),
+        user_id: int | None = Query(default=None, description="User-ID"),
+        title: str | None = Query(default=None, description="Titel enthält..."),
+        skip: int = Query(default=0, ge=0, description="Anzahl zu überspringender Posts"),
+        limit: int = Query(default=20, ge=1, le=100, description="Max. Anzahl zurückzugebender Posts"),
+        sort_by: SortByEnum = Query(default=SortByEnum.created_at, description="Sortieren nach"),
+        order: OrderEnum = Query(default=OrderEnum.desc, description="Sortierreihenfolge")
+):
+    """
+    Filtert Posts anhand verschiedener Kriterien.
+
+    Parameters:
+        - **published**: Ist der Post veröffentlicht?
+        - **user_id**: ID des Autors
+        - **title**: Titel enthält diesen String
+        - **skip**: Anzahl zu überspringender Posts (für Pagination)
+        - **limit**: Maximale Anzahl zurückzugebender Posts (1-100)
+
+    Returns:
+        list[PostRead]: Liste von Posts, die den Filtern entsprechen
+    """
+    statement = select(Post)
+
+    if published is not None:
+        statement = statement.where(Post.published == published)
+
+    if user_id is not None:
+        statement = statement.where(Post.user_id == user_id)
+
+    if title is not None:
+        statement = statement.where(Post.title.ilike(f"%{title}%"))
+
+    if order == OrderEnum.asc:
+        statement = statement.order_by(asc(getattr(Post, sort_by)))
+    else:
+        statement = statement.order_by(desc(getattr(Post, sort_by)))
+
+    statement = statement.offset(skip).limit(limit)
+    posts = session.exec(statement).all()
+
+    return posts
+
+
+@router.get(
     "/{post_id}",
     response_model=PostReadWithAuthor,
     summary="Post mit Author-Details abrufen",
@@ -92,7 +155,7 @@ def get_posts(
 )
 def get_post(
     post_id: int,
-    session: Annotated[Session, Depends(get_session)]
+    session: Session = Depends(get_session)
 ):
     """
     Gibt einen Post mit Author-Details zurück.
@@ -154,9 +217,8 @@ def update_post(
     
     # Nur übergebene Felder aktualisieren
     post_data = post_update.model_dump(exclude_unset=True)
-    
-    for key, value in post_data.items():
-        setattr(db_post, key, value)
+
+    db_post.sqlmodel_update(post_data)
     
     session.commit()
     session.refresh(db_post)
