@@ -5,14 +5,17 @@ CRUD Endpoints für Posts mit Relationships zu Users.
 """
 
 import datetime
+import math
 from enum import StrEnum
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlmodel import Session, select, asc, desc
 
 from app.database import get_session
 from app.models import Post, PostCreate, PostRead, PostReadWithAuthor, PostUpdate, User
+from app.models.post import PaginatedPostResponse
 
 router = APIRouter()
 
@@ -98,7 +101,7 @@ def get_posts(
 
 @router.get(
     "/filtered",
-    response_model=list[PostRead],
+    response_model=PaginatedPostResponse,
     summary="Posts filtern",
     description="Gibt eine Liste von Posts zurück, die mehreren Filtern entsprechen."
 )
@@ -107,44 +110,68 @@ def filter_posts(
         published: bool | None = Query(default=None, description="Ist veröffentlicht?"),
         user_id: int | None = Query(default=None, description="User-ID"),
         title: str | None = Query(default=None, description="Titel enthält..."),
-        skip: int = Query(default=0, ge=0, description="Anzahl zu überspringender Posts"),
-        limit: int = Query(default=20, ge=1, le=100, description="Max. Anzahl zurückzugebender Posts"),
         sort_by: SortByEnum = Query(default=SortByEnum.created_at, description="Sortieren nach"),
-        order: OrderEnum = Query(default=OrderEnum.desc, description="Sortierreihenfolge")
+        order: OrderEnum = Query(default=OrderEnum.desc, description="Sortierreihenfolge"),
+        page: int = Query(default=1, ge=1, description="Seite (ab 1)"),
+        page_size: int = Query(default=10, ge=1, le=100, description="Anzahl Posts pro Seite")
 ):
     """
-    Filtert Posts anhand verschiedener Kriterien.
+    Filtert Posts anhand verschiedener Kriterien mit Pagination.
 
     Parameters:
         - **published**: Ist der Post veröffentlicht?
         - **user_id**: ID des Autors
-        - **title**: Titel enthält diesen String
-        - **skip**: Anzahl zu überspringender Posts (für Pagination)
-        - **limit**: Maximale Anzahl zurückzugebender Posts (1-100)
+        - **title**: Titel enthält diesen String (case-insensitive)
+        - **sort_by**: Sortierfeld (created_at, title, id)
+        - **order**: Sortierreihenfolge (asc, desc)
+        - **page**: Seitennummer (ab 1)
+        - **page_size**: Anzahl Posts pro Seite (1-100)
 
     Returns:
-        list[PostRead]: Liste von Posts, die den Filtern entsprechen
+        PaginatedPostResponse: Posts mit Pagination-Informationen
     """
+
+    def build_filter_statement(
+            base_statement,
+            published: bool | None,
+            user_id: int | None,
+            title: str | None
+    ):
+        """Wendet Filter auf ein Statement an."""
+        if published is not None:
+            base_statement = base_statement.where(Post.published == published)
+        if user_id is not None:
+            base_statement = base_statement.where(Post.user_id == user_id)
+        if title is not None:
+            base_statement = base_statement.where(Post.title.ilike(f"%{title}%"))
+        return base_statement
+
     statement = select(Post)
 
-    if published is not None:
-        statement = statement.where(Post.published == published)
-
-    if user_id is not None:
-        statement = statement.where(Post.user_id == user_id)
-
-    if title is not None:
-        statement = statement.where(Post.title.ilike(f"%{title}%"))
+    statement = build_filter_statement(statement, published, user_id, title)
 
     if order == OrderEnum.asc:
         statement = statement.order_by(asc(getattr(Post, sort_by)))
     else:
         statement = statement.order_by(desc(getattr(Post, sort_by)))
 
-    statement = statement.offset(skip).limit(limit)
+    skip = (page - 1) * page_size
+
+    statement = statement.offset(skip).limit(page_size)
     posts = session.exec(statement).all()
 
-    return posts
+    count_statement = select(func.count(Post.id))
+    count_statement = build_filter_statement(count_statement, published, user_id, title)
+    total = session.exec(count_statement).one()
+    total_pages = math.ceil(total / page_size)
+
+    return PaginatedPostResponse(
+        items=posts,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
 
 
 @router.get(

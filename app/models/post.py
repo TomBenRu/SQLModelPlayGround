@@ -108,6 +108,14 @@ class PostReadWithAuthor(PostRead):
     author: "UserRead"
 
 
+class PaginatedPostResponse(SQLModel):
+    items: list[PostRead]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
 def rebuild_models():
     from .user import UserRead
     PostReadWithAuthor.model_rebuild()

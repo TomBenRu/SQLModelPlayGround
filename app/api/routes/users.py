@@ -12,14 +12,16 @@ Demonstriert:
 """
 
 import datetime
+from time import perf_counter
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlmodel import Session, select
+from sqlalchemy import func
+from sqlmodel import Session, select, SQLModel, desc, Field
 
 from app.database import get_session
-from app.models.user import User, UserCreate, UserRead, UserUpdate
+from app.models.user import User, UserCreate, UserRead, UserUpdate, UserStats
 from app.models.post import Post, PostRead
 
 
@@ -106,6 +108,61 @@ def get_users(
     users = session.exec(statement).all()
     
     return users
+
+
+@router.get(
+    "/stats",
+    response_model=list[UserStats],
+    summary="User-Statistiken abrufen",
+    description="Gibt alle User mit Anzahl ihrer Posts zurück."
+)
+def get_user_stats(
+    session: Session = Depends(get_session)
+):
+    """
+    Gibt alle User mit Anzahl ihrer Posts zurück.
+
+    Parameters:
+        - **session**: Datenbank-Session (wird automatisch injiziert)
+
+    Returns:
+        list[UserStats]: Liste von User-Statistiken
+    """
+
+    t0 = perf_counter()
+
+    # # Weg 1: Relationship nutzen (ineffizient bei vielen Usern)
+    # users = session.exec(select(User)).all()
+    # user_stats = []
+    # for user in users:
+    #     post_count = len(user.posts)  # Greift auf Relationship zu
+    #     user_stats.append(UserStats(
+    #         id=user.id,
+    #         name=user.name,
+    #         email=user.email,
+    #         post_count=post_count
+    #     ))
+
+    # Weg 2: Query mit JOIN und COUNT (effizienter bei vielen Usern)
+    statement = (
+        select(User.id, User.name, User.email, func.count(Post.id).label("post_count"))
+        .join(Post, isouter=True)
+        .group_by(User.id)
+        .order_by(desc("post_count"))
+    )
+    user_stats = [
+        UserStats(
+            id=row.id,
+            username=row.name,
+            email=row.email,
+            post_count=row.post_count
+        )
+        for row in session.exec(statement).all()
+    ]
+
+    print(f"Query-Dauer: {perf_counter() - t0:.2f} Sekunden")
+
+    return user_stats
 
 
 @router.get(

@@ -136,6 +136,13 @@ class UserReadWithPosts(UserRead):
     posts: list["PostRead"] = []
 
 
+class UserStats(SQLModel):
+    id: int
+    username: str
+    email: str
+    post_count: int
+
+
 def rebuild_models():
     from .post import PostRead
     UserReadWithPosts.model_rebuild()
