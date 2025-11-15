@@ -6,11 +6,13 @@ CRUD Endpoints für Posts mit Relationships zu Users.
 
 import datetime
 import math
-from enum import StrEnum
+from enum import StrEnum, Enum
+from time import perf_counter
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
+from sqlalchemy.orm import selectinload, joinedload
 from sqlmodel import Session, select, asc, desc
 
 from app.database import get_session
@@ -29,6 +31,12 @@ class SortByEnum(StrEnum):
 class OrderEnum(StrEnum):
     asc = "asc"
     desc = "desc"
+
+
+class LoadingStrategyEnum(str, Enum):
+    lazy = "lazy"
+    selectin = "selectin"
+    joined = "joined"
 
 
 @router.post(
@@ -96,6 +104,47 @@ def get_posts(
     """
     statement = select(Post).offset(skip).limit(limit)
     posts = session.exec(statement).all()
+    return posts
+
+
+@router.get(
+    "/with-authors",
+    response_model=list[PostReadWithAuthor],
+    summary="Posts mit Authors abrufen",
+    description="Gibt eine Liste aller Posts zurück mit vollständigen Author-Informationen."
+)
+def get_posts_with_authors(
+        session: Session = Depends(get_session),
+        strategy: LoadingStrategyEnum = Query(default=LoadingStrategyEnum.selectin,
+                                              description="Laden-Strategie für Relationships")
+):
+    """
+        Lädt alle Posts mit ihren Authors.
+
+        Unterstützt drei Loading-Strategien:
+        - lazy: Default Lazy Loading (N+1 Problem)
+        - selectin: Optimiert mit selectinload() (2 Queries)
+        - joined: Optimiert mit joinedload() (1 Query)
+    """
+
+    start = perf_counter()
+
+    statement = select(Post)
+
+    if strategy == LoadingStrategyEnum.selectin:
+        statement = statement.options(selectinload(Post.author))
+    elif strategy == LoadingStrategyEnum.joined:
+        statement = statement.options(joinedload(Post.author))
+
+    posts = session.exec(statement).all()
+
+    for post in posts:
+        _ = post.author
+
+    end = perf_counter()
+
+    print(f'Strategy: {strategy} - Dauer: {end - start:.4f} Sekunden, Posts: {len(posts)}')
+
     return posts
 
 
